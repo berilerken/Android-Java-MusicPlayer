@@ -1,57 +1,90 @@
 package com.example.musicplayer;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
 import android.Manifest;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
-import android.location.Location;
-import android.location.LocationListener;
-import android.location.LocationManager;
 import android.media.MediaPlayer;
+
 import android.os.Build;
 import android.os.Bundle;
-import android.util.Log;
+
+
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 
-import org.w3c.dom.Text;
 
-import java.util.ArrayList;
+public class MainActivity extends AppCompatActivity{
 
-public class MainActivity extends AppCompatActivity { //implements LocationListener{
+    Button playclick, pauseclick, nextclick, prevclick, show_location;
+    TextView addressText;
+    private BroadcastReceiver broadcastReceiver;
 
-    Button playclick, pauseclick, nextclick, prevclick;
-    TextView adressText;
-    /*protected LocationManager locationManager;
-    protected LocationListener locationListener;
-    protected Context context;
-    protected String latitude,longitude;
-    protected boolean gps_enabled,network_enabled;*/
     MediaPlayer mp;
     int currentPlayingSongIndex = 0;
     int[] playList;
-    int curretPlayingSongResId = 0;
-    //String lat;
-    //String provider;
+    int currentPlayingSongResId = 0;
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if(broadcastReceiver == null){
+            broadcastReceiver = new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+
+                    addressText.append("\n" +intent.getExtras().get("coordinates"));
+
+                }
+            };
+        }
+        registerReceiver(broadcastReceiver,new IntentFilter("location_update"));
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if(broadcastReceiver != null){
+            unregisterReceiver(broadcastReceiver);
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+
+    }
 
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        playclick = (Button)findViewById(R.id.play);
-        pauseclick = (Button)findViewById(R.id.pause);
-        nextclick = (Button)findViewById(R.id.next);
-        prevclick = (Button)findViewById(R.id.prev);
-        adressText =(TextView)findViewById(R.id.addressText);
 
-        //locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-        //locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, (LocationListener) this);
+        playclick = findViewById(R.id.play);
+        pauseclick = findViewById(R.id.pause);
+        nextclick = findViewById(R.id.next);
+        addressText = findViewById(R.id.addressText);
+        prevclick = findViewById(R.id.prev);
+        show_location = findViewById(R.id.show_location);
+
+        if(!runtime_permissions())
+            enable_buttons();
+
 
         playList = new int[]{
                 R.raw.yalin,
@@ -65,8 +98,7 @@ public class MainActivity extends AppCompatActivity { //implements LocationListe
             @Override
             public void onClick(View view) {
                 playSong(playList[currentPlayingSongIndex]);
-
-                }
+            }
         });
 
         pauseclick.setOnClickListener(new View.OnClickListener() {
@@ -79,7 +111,6 @@ public class MainActivity extends AppCompatActivity { //implements LocationListe
         nextclick.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-
                 currentPlayingSongIndex++;
                 currentPlayingSongIndex = (currentPlayingSongIndex>2)? 0 :currentPlayingSongIndex;
                 playSong(playList[currentPlayingSongIndex]);
@@ -89,20 +120,13 @@ public class MainActivity extends AppCompatActivity { //implements LocationListe
         prevclick.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                /*
-                for(int i = 0; i < 3 ; i++){
-                    if(musicList.get(i).isPlaying()){
-                        musicList.get(i-1).start();
-                    }
-                }
-
-                 */
-
                 currentPlayingSongIndex--;
                 currentPlayingSongIndex = (currentPlayingSongIndex<0)? 2 :currentPlayingSongIndex;
                 playSong(playList[currentPlayingSongIndex]);
             }
         });
+
+
 
 
     }
@@ -117,7 +141,7 @@ public class MainActivity extends AppCompatActivity { //implements LocationListe
             }
             else
             {
-                if(curretPlayingSongResId == songResId)
+                if(currentPlayingSongResId == songResId)
                 {
                     fromPause = true;
                 }
@@ -125,31 +149,49 @@ public class MainActivity extends AppCompatActivity { //implements LocationListe
 
 
         }
-        curretPlayingSongResId = songResId;
+        currentPlayingSongResId = songResId;
         if(!fromPause) mp = MediaPlayer.create(this,songResId);
         mp.start();
     }
 
-    /*@Override
-    public void onLocationChanged(Location location) {
-        adressText = (TextView)findViewById(R.id.addressText);
-        adressText.setText("Latitude:" + location.getLatitude() + ", Longitude:" + location.getLongitude());
+    private void enable_buttons() {
+
+        show_location.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Intent i =new Intent(getApplicationContext(),GPS_Service.class);
+                startService(i);
+            }
+        });
+
+
     }
 
-    @Override
-    public void onProviderDisabled(String provider) {
-        Log.d("Latitude","disable");
+
+
+    private boolean runtime_permissions() {
+        if(Build.VERSION.SDK_INT >= 23 && ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED){
+
+            requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION},100);
+
+            return true;
+        }
+        return false;
     }
 
-    @Override
-    public void onProviderEnabled(String provider) {
-        Log.d("Latitude","enable");
-    }
 
     @Override
-    public void onStatusChanged(String provider, int status, Bundle extras) {
-        Log.d("Latitude","status");
-    }*/
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if(requestCode == 100){
+            if( grantResults[0] == PackageManager.PERMISSION_GRANTED && grantResults[1] == PackageManager.PERMISSION_GRANTED){
+                enable_buttons();
+            }else {
+                runtime_permissions();
+            }
+        }
+    }
+
 }
 
 
